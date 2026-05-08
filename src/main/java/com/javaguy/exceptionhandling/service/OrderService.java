@@ -8,7 +8,6 @@ import com.javaguy.exceptionhandling.domain.repository.OrderRepository;
 import com.javaguy.exceptionhandling.dto.request.OrderRequest;
 import com.javaguy.exceptionhandling.dto.response.OrderResponse;
 import com.javaguy.exceptionhandling.exception.BusinessRuleException;
-import com.javaguy.exceptionhandling.exception.ErrorCode;
 import com.javaguy.exceptionhandling.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -48,8 +47,7 @@ public class OrderService {
         User user = userService.getOrThrow(request.userId());
         if (!user.isActive()) {
             throw new BusinessRuleException(
-                "Inactive users cannot place orders. User id: " + user.getId(),
-                ErrorCode.USER_INACTIVE
+                "Inactive users cannot place orders. User id: " + user.getId()
             );
         }
 
@@ -80,8 +78,7 @@ public class OrderService {
                 String.format(
                     "Order %d cannot be cancelled in status '%s'. Only PENDING or CONFIRMED orders are cancellable.",
                     id, order.getStatus()
-                ),
-                ErrorCode.ORDER_INVALID_CANCEL
+                )
             );
         }
         order.setStatus(OrderStatus.CANCELLED);

@@ -6,7 +6,6 @@ import com.javaguy.exceptionhandling.dto.request.ProductRequest;
 import com.javaguy.exceptionhandling.dto.response.ProductResponse;
 import com.javaguy.exceptionhandling.exception.BusinessRuleException;
 import com.javaguy.exceptionhandling.exception.ConflictException;
-import com.javaguy.exceptionhandling.exception.ErrorCode;
 import com.javaguy.exceptionhandling.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,8 +26,7 @@ public class ProductService {
     public ProductResponse create(ProductRequest request) {
         if (productRepository.existsBySku(request.sku())) {
             throw new ConflictException(
-                "A product with SKU '" + request.sku() + "' already exists",
-                ErrorCode.PRODUCT_SKU_CONFLICT
+                "A product with SKU '" + request.sku() + "' already exists"
             );
         }
         Product product = Product.builder()
@@ -65,8 +63,7 @@ public class ProductService {
                 String.format(
                     "Insufficient stock for product '%s'. Available: %d, Requested: %d",
                     product.getName(), product.getStock(), quantity
-                ),
-                ErrorCode.PRODUCT_INSUFFICIENT_STOCK
+                )
             );
         }
         product.setStock(product.getStock() - quantity);

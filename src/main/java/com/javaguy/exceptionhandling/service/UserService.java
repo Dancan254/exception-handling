@@ -6,7 +6,6 @@ import com.javaguy.exceptionhandling.dto.request.UserRequest;
 import com.javaguy.exceptionhandling.dto.response.UserResponse;
 import com.javaguy.exceptionhandling.exception.BusinessRuleException;
 import com.javaguy.exceptionhandling.exception.ConflictException;
-import com.javaguy.exceptionhandling.exception.ErrorCode;
 import com.javaguy.exceptionhandling.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,8 +33,7 @@ public class UserService {
     public UserResponse create(UserRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new ConflictException(
-                "A user with email '" + request.email() + "' already exists",
-                ErrorCode.USER_EMAIL_CONFLICT
+                "A user with email '" + request.email() + "' already exists"
             );
         }
         User user = User.builder()
@@ -67,8 +65,7 @@ public class UserService {
         User user = getOrThrow(id);
         if (!user.isActive()) {
             throw new BusinessRuleException(
-                "User with id '" + id + "' is already inactive",
-                ErrorCode.USER_INACTIVE
+                "User with id '" + id + "' is already inactive"
             );
         }
         user.setActive(false);
