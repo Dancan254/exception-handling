@@ -1,6 +1,8 @@
 # Spring Boot Exception Handling — Architecture & Patterns Guide
 
-This guide walks through the exception handling architecture used in this project, explains every design decision, and surveys the alternative patterns available in Spring Boot so you can make an informed choice in your own applications.
+This guide walks through the exception handling architecture used in this project, explains every design decision, and surveys the alternative patterns available in Spring Boot — including the simpler approaches that do not use `ProblemDetail` at all — so you can make an informed choice in your own applications.
+
+> **A note on scope:** Most tutorials you will find online teach a custom `ErrorResponse` DTO approach. That approach works well and is widely used in production. This project goes one step further by adopting the RFC 9457 standard, which many modern APIs are converging on. Read [Section 5](#5-exception-handling-without-problemdetail) to understand the simpler approach first — then the architecture in this project will make more sense by comparison.
 
 ---
 
@@ -10,9 +12,10 @@ This guide walks through the exception handling architecture used in this projec
 2. [The Exception Hierarchy](#2-the-exception-hierarchy)
 3. [The Global Handler Deep Dive](#3-the-global-handler-deep-dive)
 4. [RFC 9457 — Problem Details for HTTP APIs](#4-rfc-9457--problem-details-for-http-apis)
-5. [Alternative Patterns](#5-alternative-patterns)
-6. [When to Use What](#6-when-to-use-what)
-7. [Common Pitfalls](#7-common-pitfalls)
+5. [Exception Handling Without ProblemDetail](#5-exception-handling-without-problemdetail)
+6. [Other Alternative Patterns](#6-other-alternative-patterns)
+7. [When to Use What](#7-when-to-use-what)
+8. [Common Pitfalls](#8-common-pitfalls)
 
 ---
 
@@ -300,7 +303,136 @@ This single property instructs Spring Boot to use `ProblemDetail` as the respons
 
 ---
 
-## 5. Alternative Patterns
+## 5. Exception Handling Without ProblemDetail
+
+Before RFC 9457 became widely adopted, the most common approach was a **custom `ErrorResponse` DTO**. You will see this pattern in the majority of Spring Boot tutorials and many production codebases. It is simpler to set up and requires no special Spring Boot configuration.
+
+### The Custom ErrorResponse DTO Pattern
+
+**Step 1 — Define a response record (or class) for your error body:**
+
+```java
+public record ErrorResponse(
+        int status,
+        String error,
+        String message,
+        String path,
+        LocalDateTime timestamp
+) {}
+```
+
+**Step 2 — Create custom exception classes:**
+
+```java
+public class ResourceNotFoundException extends RuntimeException {
+    public ResourceNotFoundException(String message) {
+        super(message);
+    }
+}
+
+public class ConflictException extends RuntimeException {
+    public ConflictException(String message) {
+        super(message);
+    }
+}
+```
+
+**Step 3 — Write a global handler that returns your DTO:**
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(
+            ResourceNotFoundException ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.NOT_FOUND.value(),
+            "Not Found",
+            ex.getMessage(),
+            request.getRequestURI(),
+            LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(
+            MethodArgumentNotValidException ex, HttpServletRequest request) {
+
+        String message = ex.getBindingResult().getFieldErrors().stream()
+            .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+            .collect(Collectors.joining(", "));
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            "Validation Failed",
+            message,
+            request.getRequestURI(),
+            LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleAll(
+            Exception ex, HttpServletRequest request) {
+
+        ErrorResponse body = new ErrorResponse(
+            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            "Internal Server Error",
+            "An unexpected error occurred.",
+            request.getRequestURI(),
+            LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+}
+```
+
+**What the response looks like:**
+
+```json
+{
+  "status": 404,
+  "error": "Not Found",
+  "message": "User with id '99' was not found",
+  "path": "/api/users/99",
+  "timestamp": "2026-05-08T10:15:30.123"
+}
+```
+
+### How This Compares to the ProblemDetail Approach
+
+| Aspect | Custom ErrorResponse DTO | ProblemDetail (RFC 9457) |
+|---|---|---|
+| Setup | No special config needed | `spring.mvc.problemdetails.enabled=true` |
+| Standardisation | Your own format — clients must read your docs | Industry-standard — clients may already know the shape |
+| Flexibility | Full control over every field | Extensible via `setProperty()`, core fields are fixed |
+| Spring MVC errors | Must handle each one explicitly | Inherited from `ResponseEntityExceptionHandler` |
+| `Content-Type` | `application/json` | `application/problem+json` |
+| Tooling support | Generic JSON tooling | RFC-aware tooling (some API gateways, monitoring tools) |
+
+### When to Choose the Custom DTO Approach
+
+- You are building an internal API where you control all consumers and a shared contract is easy to maintain.
+- Your team is more comfortable with explicit, home-grown code than with framework abstractions.
+- You need a response shape that does not fit the RFC 9457 structure at all.
+- You are learning — the custom DTO approach has fewer moving parts and is easier to trace from request to response.
+
+### When to Choose ProblemDetail (RFC 9457)
+
+- You are building a public or third-party-facing API.
+- Your clients may already be tooled to parse the RFC 9457 format.
+- You want Spring Boot to handle framework-level errors (405, 415, etc.) in the same format automatically.
+- You need the `type` URI to serve as a stable, linkable reference to your error documentation.
+
+> **Bottom line:** Both approaches are valid and production-ready. The custom DTO gives you simplicity and full control. ProblemDetail gives you standardisation and free handling of Spring MVC internals. This project uses ProblemDetail as a teaching example of the modern approach — but if you are starting out, there is nothing wrong with beginning with a custom DTO and migrating later.
+
+---
+
+## 6. Other Alternative Patterns
 
 ### Pattern 1: `@ResponseStatus` on the Exception Class
 
@@ -474,17 +606,19 @@ Alternatively, configure Security to delegate 401/403 to your `@ControllerAdvice
 
 ---
 
-## 6. When to Use What
+## 7. When to Use What
 
 | Scenario | Recommended Pattern |
 |---|---|
+| Learning / first Spring Boot project | Custom `ErrorResponse` DTO + plain `@ControllerAdvice` |
 | Small prototype, just need correct status code | `@ResponseStatus` on exception class |
 | One controller with unique error format needs | Per-controller `@ExceptionHandler` |
-| Consistent JSON errors across the whole API | `@ControllerAdvice` extending `ResponseEntityExceptionHandler` |
-| Need RFC 9457 compliance with extension fields | `@ControllerAdvice` + `ProblemDetail` (this project's approach) |
+| Consistent JSON errors, internal API | Custom `ErrorResponse` DTO + `@ControllerAdvice` |
+| Consistent JSON errors, public/third-party API | `@ControllerAdvice` + `ProblemDetail` (RFC 9457) |
+| Need framework errors (405, 415) in same format | Extend `ResponseEntityExceptionHandler` |
 | Errors from filters need consistent format | `ErrorAttributes` bean as a complement |
 | Writing a framework/library | `HandlerExceptionResolver` |
-| Spring Security 401/403 in RFC 9457 format | Custom `AuthenticationEntryPoint` + `AccessDeniedHandler` |
+| Spring Security 401/403 consistent format | Custom `AuthenticationEntryPoint` + `AccessDeniedHandler` |
 
 ### Decision Flowchart
 
@@ -493,18 +627,18 @@ Do you need a consistent response format across all endpoints?
 ├── No  → @ResponseStatus or per-controller @ExceptionHandler
 └── Yes → @ControllerAdvice
           │
-          Do you need framework errors (405, 415, etc.) in the same format?
-          ├── No  → Plain @ControllerAdvice
-          └── Yes → Extend ResponseEntityExceptionHandler
+          Do you need RFC 9457 compliance?
+          ├── No  → Custom ErrorResponse DTO (simpler, full control)
+          └── Yes → ProblemDetail
                     │
-                    Do you need RFC 9457 compliance?
-                    ├── No  → Return your own Map/DTO
-                    └── Yes → Use ProblemDetail (this project's approach)
+                    Do you need framework errors (405, 415, etc.) in the same format?
+                    ├── No  → Plain @ControllerAdvice with ProblemDetail
+                    └── Yes → Extend ResponseEntityExceptionHandler (this project)
 ```
 
 ---
 
-## 7. Common Pitfalls
+## 8. Common Pitfalls
 
 ### `@ResponseStatus` Is Silently Ignored When `@ControllerAdvice` Is Present
 
