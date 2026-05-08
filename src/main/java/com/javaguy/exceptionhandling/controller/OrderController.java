@@ -6,6 +6,7 @@ import com.javaguy.exceptionhandling.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,23 +24,22 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public OrderResponse placeOrder(@Valid @RequestBody OrderRequest request) {
-        return orderService.placeOrder(request);
+    public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody OrderRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.placeOrder(request));
     }
 
     @GetMapping("/{id}")
-    public OrderResponse findById(@PathVariable Long id) {
-        return orderService.findById(id);
+    public ResponseEntity<OrderResponse> findById(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.findById(id));
     }
 
     @GetMapping
-    public List<OrderResponse> findAll() {
-        return orderService.findAll();
+    public ResponseEntity<List<OrderResponse>> findAll() {
+        return ResponseEntity.ok(orderService.findAll());
     }
 
     @PatchMapping("/{id}/cancel")
-    public OrderResponse cancel(@PathVariable Long id) {
-        return orderService.cancelOrder(id);
+    public ResponseEntity<OrderResponse> cancel(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.cancelOrder(id));
     }
 }

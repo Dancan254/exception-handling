@@ -9,6 +9,7 @@ import com.javaguy.exceptionhandling.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -33,24 +34,23 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public UserResponse create(@Valid @RequestBody UserRequest request) {
-        return userService.create(request);
+    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(userService.create(request));
     }
 
     @GetMapping("/{id}")
-    public UserResponse findById(@PathVariable Long id) {
-        return userService.findById(id);
+    public ResponseEntity<UserResponse> findById(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.findById(id));
     }
 
     @GetMapping
-    public List<UserResponse> findAll() {
-        return userService.findAll();
+    public ResponseEntity<List<UserResponse>> findAll() {
+        return ResponseEntity.ok(userService.findAll());
     }
 
     @PatchMapping("/{id}/deactivate")
-    public UserResponse deactivate(@PathVariable Long id) {
-        return userService.deactivate(id);
+    public ResponseEntity<UserResponse> deactivate(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.deactivate(id));
     }
 
     /**
@@ -58,11 +58,11 @@ public class UserController {
      * flag would be derived from the authenticated principal, not a query parameter.
      */
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id, @RequestParam(defaultValue = "false") boolean admin) {
+    public ResponseEntity<Void> delete(@PathVariable Long id, @RequestParam(defaultValue = "false") boolean admin) {
         if (!admin) {
             throw new ForbiddenException("Only administrators can delete users.");
         }
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -71,7 +71,7 @@ public class UserController {
      * distinct from 404 which could be temporary.
      */
     @GetMapping("/legacy/{id}")
-    public UserResponse legacyFind(@PathVariable Long id) {
+    public ResponseEntity<UserResponse> legacyFind(@PathVariable Long id) {
         throw new ResourceGoneException("User (legacy endpoint)", id);
     }
 
@@ -81,13 +81,14 @@ public class UserController {
      * For anything thrown from more than one place, create a dedicated exception class.
      */
     @GetMapping("/search")
-    public UserResponse search(@RequestParam(required = false) String email) {
+    public ResponseEntity<UserResponse> search(@RequestParam(required = false) String email) {
         if (email == null || email.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Query parameter 'email' is required.");
         }
         return userService.findAll().stream()
             .filter(u -> u.email().equalsIgnoreCase(email))
             .findFirst()
+            .map(ResponseEntity::ok)
             .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
     }
 }
