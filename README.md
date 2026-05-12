@@ -1,8 +1,24 @@
-# Spring Boot Exception Handling Masterclass
+# Spring Boot Exception Handling — Custom ErrorResponse Branch
 
-A hands-on reference project demonstrating production-grade exception handling in Spring Boot 4 — from a simple custom `ErrorResponse` DTO all the way to a fully RFC 9457-compliant `ProblemDetail` architecture.
+A hands-on reference project demonstrating production-grade exception handling in Spring Boot using a **custom `ErrorResponse` DTO** — the most common, widely-understood pattern you will find in real-world Spring Boot APIs.
+
+> This is the `custom-error-response` branch. It implements the simpler DTO approach deliberately, so you can understand it thoroughly before comparing it to the RFC 9457 `ProblemDetail` approach on other branches.
 
 > Built by [@Dancan254](https://github.com/Dancan254) as a teaching resource. Clone it, run it, and experiment with every endpoint while reading the guide.
+
+---
+
+## What This Branch Covers
+
+| Topic | What You Will Learn |
+|---|---|
+| Custom `ErrorResponse` record | Designing a clean, reusable error body without framework magic |
+| `@RestControllerAdvice` | Centralising all exception handling in one class |
+| Per-type `@ExceptionHandler` methods | Explicit, readable handler per exception type |
+| Validation error handling | Extracting field-level errors from `MethodArgumentNotValidException` |
+| Exception chaining | Wrapping infrastructure failures without losing stack traces |
+| Catch-all safety net | Preventing internal detail leaks on unexpected exceptions |
+| `@JsonInclude(NON_NULL)` | Omitting optional fields (like `errors`) from non-validation responses |
 
 ---
 
@@ -13,6 +29,7 @@ A hands-on reference project demonstrating production-grade exception handling i
 ```bash
 git clone https://github.com/Dancan254/exception-handling.git
 cd exception-handling
+git checkout custom-error-response
 ./mvnw spring-boot:run
 ```
 
@@ -21,6 +38,38 @@ The application starts on `http://localhost:8080` with an in-memory H2 database 
 **H2 Console:** `http://localhost:8080/h2-console`
 - JDBC URL: `jdbc:h2:mem:exceptiondb`
 - Username: `sa` / Password: *(empty)*
+
+---
+
+## Error Response Shape
+
+Every non-2xx response from this application returns this JSON body:
+
+```json
+{
+  "status": 404,
+  "error": "Not Found",
+  "message": "User with id '99' was not found",
+  "path": "/api/users/99",
+  "timestamp": "2026-05-11T10:15:30.123"
+}
+```
+
+For validation failures, a `errors` map is added and `message` describes the overall failure:
+
+```json
+{
+  "status": 400,
+  "error": "Bad Request",
+  "message": "One or more request fields failed validation.",
+  "path": "/api/users",
+  "timestamp": "2026-05-11T10:15:30.123",
+  "errors": {
+    "email": "must be a well-formed email address",
+    "name": "must not be blank"
+  }
+}
+```
 
 ---
 
@@ -86,18 +135,20 @@ src/main/java/com/javaguy/exceptionhandling/
 │   └── repository/                   # Spring Data repositories
 ├── dto/
 │   ├── request/                      # Validated input records
-│   └── response/                     # Output records with static factory methods
+│   └── response/
+│       ├── ErrorResponse.java        # Custom error body (status, error, message, path, timestamp, errors)
+│       ├── OrderResponse.java
+│       ├── ProductResponse.java
+│       └── UserResponse.java
 ├── exception/
-│   ├── base/AppException.java        # Abstract root of the exception hierarchy
-│   ├── ErrorCode.java                # Central registry of machine-readable codes
-│   ├── ResourceNotFoundException.java
-│   ├── ResourceGoneException.java
-│   ├── ConflictException.java
-│   ├── BusinessRuleException.java
-│   ├── ForbiddenException.java
-│   └── ExternalServiceException.java
+│   ├── ResourceNotFoundException.java   # 404
+│   ├── ResourceGoneException.java       # 410
+│   ├── ConflictException.java           # 409
+│   ├── BusinessRuleException.java       # 422
+│   ├── ForbiddenException.java          # 403
+│   └── ExternalServiceException.java    # 502
 ├── handler/
-│   └── GlobalExceptionHandler.java   # Single RFC 9457-compliant handler
+│   └── GlobalExceptionHandler.java   # @RestControllerAdvice — one handler per exception type
 └── service/
     ├── UserService.java
     ├── ProductService.java
@@ -111,15 +162,15 @@ src/main/java/com/javaguy/exceptionhandling/
 | | |
 |---|---|
 | **Framework** | Spring Boot 4 |
-| **Language** | Java 25 |
+| **Language** | Java 21 |
 | **Database** | H2 (in-memory) |
 | **ORM** | Spring Data JPA / Hibernate |
 | **Validation** | Jakarta Bean Validation |
-| **Error format** | RFC 9457 (`ProblemDetail`) |
+| **Error format** | Custom `ErrorResponse` DTO |
 | **Boilerplate** | Lombok |
 
 ---
 
 ## Learning Guide
 
-For the full architecture walkthrough, alternative patterns, and common pitfalls read **[EXCEPTION_HANDLING_GUIDE.md](EXCEPTION_HANDLING_GUIDE.md)**.
+For the full architecture walkthrough, how the custom DTO pattern compares to RFC 9457 `ProblemDetail`, and common pitfalls read **[EXCEPTION_HANDLING_GUIDE.md](EXCEPTION_HANDLING_GUIDE.md)**.
