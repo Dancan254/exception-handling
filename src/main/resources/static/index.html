@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ShopAPI — Exception Handling Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0d0d;
+      --surface:   #111111;
+      --card:      #1a1a1a;
+      --border:    #2a2a2a;
+      --purple:    #7B2FFF;
+      --purple-lg: rgba(123,47,255,0.12);
+      --text:      #f0f0f0;
+      --muted:     #777;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --yellow:    #fbbf24;
+      --blue:      #60a5fa;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Nav ── */
+    nav {
+      background: var(--surface);
+      border-bottom: 3px solid var(--purple);
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--purple);
+      padding: 16px 20px 16px 0;
+      margin-right: 12px;
+      border-right: 1px solid var(--border);
+      letter-spacing: -0.01em;
+    }
+    .nav-tab {
+      background: none;
+      border: none;
+      color: var(--muted);
+      padding: 18px 16px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -3px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .nav-tab:hover  { color: var(--text); }
+    .nav-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+    .nav-spacer { flex: 1; }
+    .server-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: background .3s; }
+    .server-dot.online { background: var(--green); }
+    #serverLabel { font-size: 0.72rem; color: var(--muted); margin-left: 6px; }
+
+    /* ── Page ── */
+    .page { display: none; flex: 1; padding: 32px 40px; max-width: 960px; margin: 0 auto; width: 100%; }
+    .page.active { display: block; }
+
+    h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
+    h2 span { color: var(--muted); font-weight: 400; font-size: 0.9rem; margin-left: 8px; }
+    .page-desc { color: var(--muted); font-size: 0.82rem; margin-bottom: 28px; }
+
+    /* ── Cards grid ── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 32px; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color .15s;
+    }
+    .card:hover { border-color: #444; }
+    .card-title { font-weight: 600; font-size: 0.92rem; }
+    .card-sub   { font-size: 0.75rem; color: var(--muted); }
+    .card-price { font-size: 1.1rem; font-weight: 700; color: var(--purple); margin-top: 4px; }
+
+    .badge-stock {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-top: 4px;
+    }
+    .in-stock  { background: rgba(34,197,94,.15); color: var(--green); }
+    .no-stock  { background: rgba(239,68,68,.15); color: var(--red); }
+
+    .badge-status {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    .active-badge   { background: rgba(34,197,94,.15); color: var(--green); }
+    .inactive-badge { background: rgba(239,68,68,.15); color: var(--red); }
+
+    /* ── Forms ── */
+    .form-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+    .form-card h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .form-row.single { grid-template-columns: 1fr; }
+    .form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    input, select {
+      background: #111;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    input:focus, select:focus { border-color: var(--purple); }
+    input.error, select.error { border-color: var(--red); }
+    .field-error { font-size: 0.72rem; color: var(--red); min-height: 16px; }
+
+    .btn {
+      padding: 9px 20px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.83rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary   { background: var(--purple); color: #fff; }
+    .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .btn-danger    { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+    .btn-sm        { padding: 5px 12px; font-size: 0.75rem; }
+
+    /* ── Orders table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: .05em; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+
+    .order-status {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    .status-PENDING   { background: rgba(251,191,36,.15); color: var(--yellow); }
+    .status-CONFIRMED { background: rgba(96,165,250,.15); color: var(--blue); }
+    .status-SHIPPED   { background: rgba(34,197,94,.15); color: var(--green); }
+    .status-CANCELLED { background: rgba(120,120,120,.15); color: var(--muted); }
+    .status-DELIVERED { background: rgba(34,197,94,.25); color: var(--green); }
+
+    /* ── Toasts ── */
+    #toastContainer {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 9999;
+    }
+    .toast {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      min-width: 300px;
+      max-width: 380px;
+      animation: slideIn .2s ease;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    }
+    .toast.error  { border-left: 4px solid var(--red); }
+    .toast.success{ border-left: 4px solid var(--green); }
+    .toast.info   { border-left: 4px solid var(--blue); }
+    .toast-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+    .toast-body { flex: 1; }
+    .toast-title { font-size: 0.82rem; font-weight: 600; margin-bottom: 2px; }
+    .toast-msg   { font-size: 0.75rem; color: var(--muted); line-height: 1.4; }
+    .toast-trace { font-size: 0.65rem; color: #555; font-family: monospace; margin-top: 4px; }
+    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } }
+
+    /* ── Debug drawer ── */
+    #debugDrawer {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      position: sticky;
+      bottom: 0;
+    }
+    #debugToggle {
+      width: 100%;
+      background: none;
+      border: none;
+      border-bottom: 1px solid transparent;
+      color: var(--muted);
+      padding: 8px 20px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color .15s;
+    }
+    #debugToggle:hover { color: var(--text); }
+    #debugToggle .arrow { transition: transform .2s; }
+    #debugToggle.open .arrow { transform: rotate(180deg); }
+    #debugPanel {
+      display: none;
+      padding: 16px 20px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    #debugPanel.open { display: block; }
+    pre.json {
+      font-family: 'JetBrains Mono','Fira Code',monospace;
+      font-size: 0.72rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .json-key    { color: #c4b5fd; }
+    .json-string { color: #86efac; }
+    .json-number { color: #fbbf24; }
+    .json-bool   { color: #60a5fa; }
+    .json-null   { color: var(--muted); }
+
+    .empty-state { text-align: center; color: var(--muted); padding: 40px; font-size: 0.85rem; }
+
+    select option { background: #1a1a1a; }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+  <div class="nav-brand">ShopAPI</div>
+  <button class="nav-tab active" onclick="showPage('products')">Products</button>
+  <button class="nav-tab" onclick="showPage('users')">Users</button>
+  <button class="nav-tab" onclick="showPage('orders')">Orders</button>
+  <div class="nav-spacer"></div>
+  <div class="server-dot" id="serverDot"></div>
+  <span id="serverLabel">checking…</span>
+</nav>
+
+<!-- ── Pages ── -->
+
+<!-- Products -->
+<div class="page active" id="page-products">
+  <h2>Products <span id="productCount"></span></h2>
+  <p class="page-desc">Browse the catalogue. Use "Check Price" to call the external pricing service.</p>
+
+  <div class="grid" id="productGrid"></div>
+
+  <div class="form-card">
+    <h3>Add Product</h3>
+    <div class="form-row">
+      <div class="field">
+        <label>SKU</label>
+        <input id="p-sku" placeholder="e.g. WATCH-001"/>
+        <span class="field-error" id="err-p-sku"></span>
+      </div>
+      <div class="field">
+        <label>Name</label>
+        <input id="p-name" placeholder="e.g. Smart Watch"/>
+        <span class="field-error" id="err-p-name"></span>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Price ($)</label>
+        <input id="p-price" type="number" min="0.01" step="0.01" placeholder="0.00"/>
+        <span class="field-error" id="err-p-price"></span>
+      </div>
+      <div class="field">
+        <label>Stock</label>
+        <input id="p-stock" type="number" min="0" placeholder="0"/>
+        <span class="field-error" id="err-p-stock"></span>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="createProduct()">Add Product</button>
+  </div>
+</div>
+
+<!-- Users -->
+<div class="page" id="page-users">
+  <h2>Users <span id="userCount"></span></h2>
+  <p class="page-desc">Manage accounts. Try deactivating Bob — he's already inactive.</p>
+
+  <div class="grid" id="userGrid"></div>
+
+  <div class="form-card">
+    <h3>Create Account</h3>
+    <div class="form-row">
+      <div class="field">
+        <label>Full Name</label>
+        <input id="u-name" placeholder="e.g. Carol White"/>
+        <span class="field-error" id="err-u-name"></span>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="u-email" type="email" placeholder="carol@example.com"/>
+        <span class="field-error" id="err-u-email"></span>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="createUser()">Create Account</button>
+  </div>
+
+  <div class="form-card" style="margin-top:-16px">
+    <h3>Search by Email</h3>
+    <div class="form-row">
+      <div class="field">
+        <input id="u-search" placeholder="Enter email address…"/>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="searchUser()">Search</button>
+      <button class="btn btn-secondary" onclick="searchUser(true)">Search without email (trigger 400)</button>
+    </div>
+    <div id="searchResult" style="margin-top:12px;font-size:.82rem;color:var(--muted)"></div>
+  </div>
+</div>
+
+<!-- Orders -->
+<div class="page" id="page-orders">
+  <h2>Orders <span id="orderCount"></span></h2>
+  <p class="page-desc">Place and manage orders. Try ordering a Phone (out of stock) or ordering as Bob (inactive).</p>
+
+  <div class="form-card">
+    <h3>Place Order</h3>
+    <div class="form-row triple">
+      <div class="field">
+        <label>Customer</label>
+        <select id="o-user">
+          <option value="">Select user…</option>
+        </select>
+        <span class="field-error" id="err-o-user"></span>
+      </div>
+      <div class="field">
+        <label>Product</label>
+        <select id="o-product">
+          <option value="">Select product…</option>
+        </select>
+        <span class="field-error" id="err-o-product"></span>
+      </div>
+      <div class="field">
+        <label>Quantity</label>
+        <input id="o-qty" type="number" min="1" value="1"/>
+        <span class="field-error" id="err-o-qty"></span>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="placeOrder()">Place Order</button>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Customer</th><th>Product</th><th>Qty</th><th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="orderTable"><tr><td colspan="6" class="empty-state">No orders yet</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Debug drawer ── -->
+<div id="debugDrawer">
+  <button id="debugToggle" onclick="toggleDebug()">
+    <span class="arrow">▲</span>
+    RFC 9457 — Last API Response
+    <span id="debugStatus" style="margin-left:auto;font-family:monospace;font-size:.7rem;color:var(--muted)"></span>
+  </button>
+  <div id="debugPanel">
+    <pre class="json" id="debugJson" style="color:var(--muted)">Fire a request to see the raw ProblemDetail response here.</pre>
+  </div>
+</div>
+
+<!-- ── Toasts ── -->
+<div id="toastContainer"></div>
+
+<script>
+// ── Error messages ──────────────────────────────────────────────────────────
+const USER_MESSAGES = {
+  RESOURCE_NOT_FOUND:         "We couldn't find what you're looking for.",
+  USER_EMAIL_CONFLICT:        "An account with this email already exists. Try signing in instead.",
+  PRODUCT_SKU_CONFLICT:       "A product with this SKU already exists in the catalogue.",
+  PRODUCT_INSUFFICIENT_STOCK: "Sorry, this item is currently out of stock.",
+  ORDER_INVALID_CANCEL:       "This order can no longer be cancelled.",
+  USER_INACTIVE:              "This account is inactive. Please contact support.",
+  FORBIDDEN:                  "You don't have permission to perform this action.",
+  RESOURCE_GONE:              "This resource has been permanently removed and won't return.",
+  RESPONSE_STATUS_ERROR:      "The request was invalid. Please check your input.",
+  VALIDATION_FAILED:          "Please fix the highlighted fields and try again.",
+  EXTERNAL_SERVICE_ERROR:     "Our pricing service is temporarily unavailable. Please try again shortly.",
+  DATA_CONFLICT:              "A resource with the same unique value already exists.",
+  INTERNAL_ERROR:             "Something went wrong on our end. Our team has been notified.",
+};
+
+// ── State ───────────────────────────────────────────────────────────────────
+let users = [], products = [], orders = [];
+
+// ── API wrapper ─────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { "Content-Type": "application/json" } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  let data = null;
+  try { data = await res.json(); } catch (_) {}
+  updateDebug(res.status, data);
+  return { status: res.status, ok: res.ok, data };
+}
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Products ─────────────────────────────────────────────────────────────────
+async function loadProducts() {
+  const r = await api("GET", "/api/products");
+  if (!r.ok) return;
+  products = r.data;
+  renderProducts();
+  populateProductSelect();
+}
+
+function renderProducts() {
+  document.getElementById("productCount").textContent = `(${products.length})`;
+  const grid = document.getElementById("productGrid");
+  if (!products.length) { grid.innerHTML = '<p class="empty-state">No products yet.</p>'; return; }
+  grid.innerHTML = products.map(p => `
+    <div class="card">
+      <div class="card-sub">${p.sku}</div>
+      <div class="card-title">${p.name}</div>
+      <div class="card-price">$${Number(p.price).toFixed(2)}</div>
+      <span class="badge-stock ${p.stock > 0 ? 'in-stock' : 'no-stock'}">
+        ${p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'}
+      </span>
+      <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="priceCheck(${p.id})">
+        Check Live Price
+      </button>
+    </div>
+  `).join('');
+}
+
+async function createProduct() {
+  clearErrors(['p-sku','p-name','p-price','p-stock']);
+  const sku   = document.getElementById("p-sku").value.trim();
+  const name  = document.getElementById("p-name").value.trim();
+  const price = parseFloat(document.getElementById("p-price").value);
+  const stock = parseInt(document.getElementById("p-stock").value);
+  const r = await api("POST", "/api/products", { sku, name, price, stock });
+  if (r.ok) {
+    toast("success", "Product added", `${r.data.name} is now in the catalogue.`);
+    clearInputs(["p-sku","p-name","p-price","p-stock"]);
+    await loadProducts();
+  } else {
+    handleError(r, { fieldPrefix: "p-" });
+  }
+}
+
+async function priceCheck(id) {
+  const r = await api("GET", `/api/products/${id}/price-check`);
+  if (r.ok) {
+    toast("success", "Live price", `SKU: ${r.data.sku} — $${r.data.listedPrice}`);
+  } else {
+    handleError(r);
+  }
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+async function loadUsers() {
+  const r = await api("GET", "/api/users");
+  if (!r.ok) return;
+  users = r.data;
+  renderUsers();
+  populateUserSelect();
+}
+
+function renderUsers() {
+  document.getElementById("userCount").textContent = `(${users.length})`;
+  const grid = document.getElementById("userGrid");
+  if (!users.length) { grid.innerHTML = '<p class="empty-state">No users yet.</p>'; return; }
+  grid.innerHTML = users.map(u => `
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="card-title">${u.name}</div>
+        <span class="badge-status ${u.active ? 'active-badge' : 'inactive-badge'}">
+          ${u.active ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+      <div class="card-sub">${u.email}</div>
+      ${u.active
+        ? `<button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="deactivateUser(${u.id})">Deactivate</button>`
+        : `<button class="btn btn-secondary btn-sm" style="margin-top:8px" disabled>Already inactive</button>`
+      }
+      <button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="deleteUser(${u.id})">Delete (non-admin)</button>
+      <button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="legacyLookup(${u.id})">Legacy endpoint</button>
+    </div>
+  `).join('');
+}
+
+async function createUser() {
+  clearErrors(['u-name','u-email']);
+  const name  = document.getElementById("u-name").value.trim();
+  const email = document.getElementById("u-email").value.trim();
+  const r = await api("POST", "/api/users", { name, email });
+  if (r.ok) {
+    toast("success", "Account created", `Welcome, ${r.data.name}!`);
+    clearInputs(["u-name","u-email"]);
+    await loadUsers();
+  } else {
+    handleError(r, { fieldPrefix: "u-" });
+  }
+}
+
+async function deactivateUser(id) {
+  const r = await api("PATCH", `/api/users/${id}/deactivate`);
+  if (r.ok) {
+    toast("success", "Account deactivated", `User has been deactivated.`);
+    await loadUsers();
+  } else {
+    handleError(r);
+  }
+}
+
+async function deleteUser(id) {
+  // intentionally no ?admin=true → triggers ForbiddenException
+  const r = await api("DELETE", `/api/users/${id}`);
+  if (r.ok) {
+    await loadUsers();
+  } else {
+    handleError(r);
+  }
+}
+
+async function legacyLookup(id) {
+  const r = await api("GET", `/api/users/legacy/${id}`);
+  if (!r.ok) handleError(r);
+}
+
+async function searchUser(skipEmail = false) {
+  const email = skipEmail ? "" : document.getElementById("u-search").value.trim();
+  const url   = email ? `/api/users/search?email=${encodeURIComponent(email)}` : "/api/users/search";
+  const r = await api("GET", url);
+  const out = document.getElementById("searchResult");
+  if (r.ok) {
+    out.innerHTML = `<strong style="color:var(--green)">Found:</strong> ${r.data.name} — ${r.data.email}`;
+  } else {
+    out.textContent = "";
+    handleError(r);
+  }
+}
+
+// ── Orders ────────────────────────────────────────────────────────────────────
+async function loadOrders() {
+  const r = await api("GET", "/api/orders");
+  if (!r.ok) return;
+  orders = r.data;
+  renderOrders();
+}
+
+function renderOrders() {
+  document.getElementById("orderCount").textContent = `(${orders.length})`;
+  const tbody = document.getElementById("orderTable");
+  if (!orders.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No orders yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = [...orders].reverse().map(o => `
+    <tr>
+      <td style="color:var(--muted)">#${o.id}</td>
+      <td>${o.userName}</td>
+      <td>${o.productName}</td>
+      <td>${o.quantity}</td>
+      <td><span class="order-status status-${o.status}">${o.status}</span></td>
+      <td>
+        ${['PENDING','CONFIRMED'].includes(o.status)
+          ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder(${o.id})">Cancel</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="cancelOrder(${o.id})">Cancel again</button>`
+        }
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function placeOrder() {
+  clearErrors(['o-user','o-product','o-qty']);
+  const userId    = parseInt(document.getElementById("o-user").value);
+  const productId = parseInt(document.getElementById("o-product").value);
+  const quantity  = parseInt(document.getElementById("o-qty").value);
+  const r = await api("POST", "/api/orders", { userId, productId, quantity });
+  if (r.ok) {
+    toast("success", "Order placed!", `Order #${r.data.id} is now ${r.data.status}.`);
+    await loadOrders();
+  } else {
+    handleError(r, { fieldPrefix: "o-" });
+  }
+}
+
+async function cancelOrder(id) {
+  const r = await api("PATCH", `/api/orders/${id}/cancel`);
+  if (r.ok) {
+    toast("info", "Order cancelled", `Order #${id} has been cancelled.`);
+    await loadOrders();
+  } else {
+    handleError(r);
+  }
+}
+
+// ── Selects ───────────────────────────────────────────────────────────────────
+function populateUserSelect() {
+  const sel = document.getElementById("o-user");
+  const val = sel.value;
+  sel.innerHTML = '<option value="">Select user…</option>' +
+    users.map(u => `<option value="${u.id}">${u.name} ${u.active ? '' : '(inactive)'}</option>`).join('');
+  sel.value = val;
+}
+
+function populateProductSelect() {
+  const sel = document.getElementById("o-product");
+  const val = sel.value;
+  sel.innerHTML = '<option value="">Select product…</option>' +
+    products.map(p => `<option value="${p.id}">${p.name} — ${p.stock > 0 ? p.stock + ' in stock' : 'OUT OF STOCK'}</option>`).join('');
+  sel.value = val;
+}
+
+// ── Error handling ────────────────────────────────────────────────────────────
+// Field name mapping: server field → form input id suffix
+const FIELD_MAP = {
+  name: "name", email: "email", sku: "sku", price: "price", stock: "stock",
+  userId: "user", productId: "product", quantity: "qty",
+};
+
+function handleError(r, { fieldPrefix = "" } = {}) {
+  const data      = r.data ?? {};
+  const errorCode = data.errorCode ?? "INTERNAL_ERROR";
+  const userMsg   = USER_MESSAGES[errorCode] ?? "An unexpected error occurred.";
+  const traceId   = data.traceId;
+
+  if (errorCode === "VALIDATION_FAILED" && data.errors) {
+    Object.entries(data.errors).forEach(([field, msg]) => {
+      const inputId = fieldPrefix + (FIELD_MAP[field] ?? field);
+      const input   = document.getElementById(inputId);
+      const errSpan = document.getElementById(`err-${inputId}`);
+      if (input)   input.classList.add("error");
+      if (errSpan) errSpan.textContent = msg;
+    });
+    toast("error", "Invalid input", userMsg);
+  } else {
+    toast("error", httpTitle(r.status), userMsg, traceId);
+  }
+}
+
+function httpTitle(status) {
+  const map = {
+    400: "Bad Request", 403: "Permission Denied", 404: "Not Found",
+    409: "Conflict", 410: "Gone", 422: "Business Rule Violation",
+    500: "Server Error", 502: "Service Unavailable",
+  };
+  return map[status] ?? `Error ${status}`;
+}
+
+// ── Toasts ────────────────────────────────────────────────────────────────────
+function toast(type, title, msg, traceId) {
+  const icons = { success: "✓", error: "✕", info: "ℹ" };
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.innerHTML = `
+    <div class="toast-icon" style="color:${type==='success'?'var(--green)':type==='error'?'var(--red)':'var(--blue)'}">${icons[type]}</div>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      <div class="toast-msg">${msg}</div>
+      ${traceId ? `<div class="toast-trace">trace: ${traceId.substring(0,16)}…</div>` : ''}
+    </div>
+  `;
+  document.getElementById("toastContainer").appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+// ── Debug drawer ──────────────────────────────────────────────────────────────
+function updateDebug(status, data) {
+  const label = document.getElementById("debugStatus");
+  const color = status >= 400 ? "var(--red)" : "var(--green)";
+  label.innerHTML = `<span style="color:${color}">${status}</span>`;
+  document.getElementById("debugJson").innerHTML = data
+    ? syntaxHighlight(data)
+    : `<span style="color:var(--muted)">No body</span>`;
+}
+
+function toggleDebug() {
+  const btn   = document.getElementById("debugToggle");
+  const panel = document.getElementById("debugPanel");
+  btn.classList.toggle("open");
+  panel.classList.toggle("open");
+}
+
+function syntaxHighlight(json) {
+  return JSON.stringify(json, null, 2).replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="json-key">${m}</span>` : `<span class="json-string">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="json-bool">${m}</span>`;
+      if (/null/.test(m))       return `<span class="json-null">${m}</span>`;
+      return `<span class="json-number">${m}</span>`;
+    }
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function clearErrors(ids) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove("error");
+    const err = document.getElementById(`err-${id}`);
+    if (err) err.textContent = "";
+  });
+}
+function clearInputs(ids) {
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+}
+
+// ── Server heartbeat ──────────────────────────────────────────────────────────
+async function checkServer() {
+  try {
+    await fetch("/api/users", { signal: AbortSignal.timeout(2000) });
+    document.getElementById("serverDot").className = "server-dot online";
+    document.getElementById("serverLabel").textContent = "online";
+  } catch {
+    document.getElementById("serverDot").className = "server-dot";
+    document.getElementById("serverLabel").textContent = "offline";
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function boot() {
+  await checkServer();
+  await Promise.all([loadUsers(), loadProducts(), loadOrders()]);
+  setInterval(checkServer, 15000);
+}
+
+boot();
+</script>
+</body>
+</html>

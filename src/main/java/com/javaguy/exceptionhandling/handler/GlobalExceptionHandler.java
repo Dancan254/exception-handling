@@ -15,6 +15,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -66,7 +67,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("Application error [{}] at {}: {}", ex.getErrorCode(), request.getRequestURI(), ex.getMessage());
 
         ProblemDetail problem = buildProblemDetail(ex.getStatus(), ex.getMessage(), ex.getErrorCode(), request);
-        problem.setType(URI.create(ERROR_TYPE_BASE + ex.getErrorCode().toLowerCase().replace('_', '-')));
 
         return ResponseEntity.status(ex.getStatus()).body(problem);
     }
@@ -140,13 +140,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 (first, second) -> first + "; " + second
             ));
 
-        ProblemDetail problem = ProblemDetail.forStatus(status);
+        HttpServletRequest httpRequest = ((ServletWebRequest) request).getRequest();
+        ProblemDetail problem = buildProblemDetail(
+            HttpStatus.valueOf(status.value()),
+            "One or more request fields failed validation.",
+            ErrorCode.VALIDATION_FAILED,
+            httpRequest
+        );
         problem.setTitle("Validation Failed");
-        problem.setDetail("One or more request fields failed validation.");
-        problem.setType(URI.create(ERROR_TYPE_BASE + "validation-failed"));
         problem.setProperty("errors", fieldErrors);
-        problem.setProperty("traceId", resolveTraceId());
-        problem.setProperty("timestamp", Instant.now());
 
         return ResponseEntity.status(status).headers(headers).body(problem);
     }
@@ -178,6 +180,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatus status, String detail, String errorCode, HttpServletRequest request) {
 
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+        problem.setType(URI.create(ERROR_TYPE_BASE + errorCode.toLowerCase().replace('_', '-')));
         problem.setTitle(status.getReasonPhrase());
         problem.setInstance(URI.create(request.getRequestURI()));
         problem.setProperty("errorCode", errorCode);

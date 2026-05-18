@@ -1,0 +1,221 @@
+### Exception Handling Masterclass — HTTP Test Suite
+### Run with IntelliJ HTTP Client or VS Code REST Client
+### Start the app first: ./mvnw spring-boot:run
+###
+### Seed data (resets on every restart):
+###   User  id=1  Alice Johnson  alice@example.com  active=true
+###   User  id=2  Bob Smith      bob@example.com    active=false
+###   Product id=1  LAPTOP-001  Pro Laptop 15  stock=10
+###   Product id=2  PHONE-001   SmartPhone X   stock=0
+
+@base = http://localhost:8080
+
+###############################################################################
+# HAPPY PATH — set up state for later exception scenarios
+###############################################################################
+
+### List all users (verify seed data)
+GET {{base}}/api/users
+
+###
+
+### List all products (verify seed data)
+GET {{base}}/api/products
+
+###
+
+### Place a valid order (Alice buys 1 laptop) → save the returned id for cancel tests
+POST {{base}}/api/orders
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "productId": 1,
+  "quantity": 1
+}
+
+###############################################################################
+# 400 — Validation error (MethodArgumentNotValidException)
+# errorCode: VALIDATION_FAILED
+# Triggered by: @Valid + @NotBlank / @Email on UserRequest
+###############################################################################
+
+### All fields blank + bad email format → two field errors in "errors" map
+POST {{base}}/api/users
+Content-Type: application/json
+
+{
+  "name": "",
+  "email": "not-an-email"
+}
+
+###
+
+### Missing required fields entirely → null/missing violations
+POST {{base}}/api/orders
+Content-Type: application/json
+
+{
+  "quantity": 0
+}
+
+###############################################################################
+# 400 — ResponseStatusException thrown inline in controller
+# errorCode: RESPONSE_STATUS_ERROR
+# Triggered by: missing 'email' query param in UserController.search()
+###############################################################################
+
+### No email param at all
+GET {{base}}/api/users/search
+
+###
+
+### Blank email param
+GET {{base}}/api/users/search?email=
+
+###############################################################################
+# 403 — ForbiddenException
+# errorCode: FORBIDDEN
+# Triggered by: DELETE /api/users/{id} without admin=true
+###############################################################################
+
+### Non-admin delete attempt
+DELETE {{base}}/api/users/1
+
+###############################################################################
+# 404 — ResourceNotFoundException
+# errorCode: RESOURCE_NOT_FOUND
+# Triggered by: entity lookup failing in service.getOrThrow()
+###############################################################################
+
+### User not found
+GET {{base}}/api/users/999
+
+###
+
+### Product not found
+GET {{base}}/api/products/999
+
+###
+
+### Order not found
+GET {{base}}/api/orders/999
+
+###
+
+### Search by email — user exists in DB check but not in result
+GET {{base}}/api/users/search?email=nobody@example.com
+
+###############################################################################
+# 409 — ConflictException (service-layer uniqueness check)
+# errorCode: USER_EMAIL_CONFLICT
+# Triggered by: UserService.create() — email already in use
+###############################################################################
+
+### Alice's email is already seeded
+POST {{base}}/api/users
+Content-Type: application/json
+
+{
+  "name": "Alice Clone",
+  "email": "alice@example.com"
+}
+
+###############################################################################
+# 409 — ConflictException (service-layer uniqueness check)
+# errorCode: PRODUCT_SKU_CONFLICT
+# Triggered by: ProductService.create() — SKU already in use
+###############################################################################
+
+### LAPTOP-001 is already seeded
+POST {{base}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "LAPTOP-001",
+  "name": "Fake Laptop",
+  "price": 999.00,
+  "stock": 5
+}
+
+###############################################################################
+# 410 — ResourceGoneException
+# errorCode: RESOURCE_GONE
+# Triggered by: GET /api/users/legacy/{id} — retired endpoint
+###############################################################################
+
+GET {{base}}/api/users/legacy/1
+
+###############################################################################
+# 422 — BusinessRuleException: inactive user cannot place orders
+# errorCode: USER_INACTIVE
+# Triggered by: OrderService.placeOrder() — Bob (id=2) is inactive
+###############################################################################
+
+POST {{base}}/api/orders
+Content-Type: application/json
+
+{
+  "userId": 2,
+  "productId": 1,
+  "quantity": 1
+}
+
+###############################################################################
+# 422 — BusinessRuleException: insufficient stock
+# errorCode: PRODUCT_INSUFFICIENT_STOCK
+# Triggered by: ProductService.reduceStock() — Phone (id=2) has stock=0
+###############################################################################
+
+POST {{base}}/api/orders
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "productId": 2,
+  "quantity": 1
+}
+
+###############################################################################
+# 422 — BusinessRuleException: cannot deactivate an already-inactive user
+# errorCode: USER_INACTIVE
+# Triggered by: UserService.deactivate() — Bob (id=2) is already inactive
+###############################################################################
+
+PATCH {{base}}/api/users/2/deactivate
+
+###############################################################################
+# 422 — BusinessRuleException: cannot cancel a CANCELLED order
+# errorCode: ORDER_INVALID_CANCEL
+#
+# Step 1: place an order to get an id (do this first if you haven't above)
+# Step 2: cancel it once → becomes CANCELLED
+# Step 3: cancel again → BusinessRuleException
+#
+# Replace {orderId} with the id returned from the place-order call above.
+###############################################################################
+
+### Step 2 — cancel the order (replace 1 with actual id)
+PATCH {{base}}/api/orders/1/cancel
+
+###
+
+### Step 3 — cancel again → ORDER_INVALID_CANCEL
+PATCH {{base}}/api/orders/1/cancel
+
+###############################################################################
+# 502 — ExternalServiceException (with exception chaining)
+# errorCode: EXTERNAL_SERVICE_ERROR
+# Triggered by: ProductController.externalPriceCheck() — simulated timeout
+# Note: the original RuntimeException cause is in the logs, not in the response
+###############################################################################
+
+GET {{base}}/api/products/1/price-check
+
+###############################################################################
+# 404 — ExternalServiceException on missing product (price-check guard)
+# errorCode: RESOURCE_NOT_FOUND
+# Triggered by: productService.findById() inside price-check before the external call
+###############################################################################
+
+GET {{base}}/api/products/999/price-check

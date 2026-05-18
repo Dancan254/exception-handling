@@ -1,5 +1,6 @@
 package com.javaguy.exceptionhandling.exception.base;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -14,6 +15,7 @@ import org.springframework.http.HttpStatus;
  * chaining: callers that wrap a lower-level exception must always pass it as the cause so
  * that the original stack trace is preserved in logs.
  */
+@Getter
 public abstract class AppException extends RuntimeException {
 
     private final String errorCode;
@@ -31,11 +33,4 @@ public abstract class AppException extends RuntimeException {
         this.status = status;
     }
 
-    public String getErrorCode() {
-        return errorCode;
-    }
-
-    public HttpStatus getStatus() {
-        return status;
-    }
 }

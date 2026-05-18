@@ -166,7 +166,7 @@ Both are valid choices. The trade-offs:
 | Adding new codes | Add a constant | Add an enum value |
 | IDE navigation | ✓ Find usages works | ✓ Find usages works |
 
-String constants are chosen here to keep the code simpler and more readable for a teaching context. In a production codebase shared by multiple teams, an enum is often the better choice because the compiler catches typos.
+String constants are chosen here to keep the code simpler and more readable for this context. In a production codebase shared by multiple teams, an enum is often the better choice because the compiler catches typos.
 
 ---
 

@@ -19,6 +19,7 @@ public final class ErrorCode {
     public static final String EXTERNAL_SERVICE_ERROR     = "EXTERNAL_SERVICE_ERROR";
     public static final String RESPONSE_STATUS_ERROR      = "RESPONSE_STATUS_ERROR";
     public static final String INTERNAL_ERROR             = "INTERNAL_ERROR";
+    public static final String VALIDATION_FAILED          = "VALIDATION_FAILED";
 
     public static final String USER_EMAIL_CONFLICT        = "USER_EMAIL_CONFLICT";
     public static final String USER_INACTIVE              = "USER_INACTIVE";
